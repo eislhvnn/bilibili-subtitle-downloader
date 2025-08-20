@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B站字幕下载助手 - 空白页面</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+        
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        
+        .feature-list {
+            text-align: left;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .feature-list h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .feature-list ul {
+            color: #666;
+            line-height: 1.8;
+        }
+        
+        .feature-list li {
+            margin-bottom: 8px;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: transform 0.3s ease;
+            margin: 10px;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .download-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .video-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+            min-width: 200px;
+        }
+        
+        .video-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .download-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            white-space: nowrap;
+        }
+        
+        .download-btn:hover {
+            background: linear-gradient(135deg, #218838 0%, #1ea085 100%);
+        }
+        
+        .status-message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            min-height: 20px;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .mode-selector {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .mode-toggle {
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .mode-toggle input[type="checkbox"] {
+            display: none;
+        }
+        
+        .slider {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background: #ccc;
+            border-radius: 12px;
+            margin-right: 10px;
+            transition: background 0.3s ease;
+        }
+        
+        .slider:before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            background: white;
+            transition: transform 0.3s ease;
+        }
+        
+        .mode-toggle input[type="checkbox"]:checked + .slider {
+            background: #667eea;
+        }
+        
+        .mode-toggle input[type="checkbox"]:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .parts-list {
+            margin: 20px 0;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .parts-list h4 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .parts-container {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .part-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.3s ease;
+        }
+        
+        .part-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .part-title {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+            margin-right: 10px;
+        }
+        
+        .part-download-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: transform 0.2s ease;
+        }
+        
+        .part-download-btn:hover {
+            transform: translateY(-1px);
+            background: linear-gradient(135deg, #218838 0%, #1ea085 100%);
+        }
+        
+        .part-download-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            color: #999;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 B站字幕下载助手</h1>
+        <p>欢迎使用B站字幕下载助手！这个插件可以帮助您轻松下载B站视频的字幕文件。</p>
+        
+        <div class="feature-list">
+            <h3>✨ 主要功能</h3>
+            <ul>
+                <li>🔍 自动检测B站视频页面</li>
+                <li>📥 一键下载视频字幕</li>
+                <li>🔄 支持多P视频和合集</li>
+                <li>📝 自动转换为SRT格式</li>
+                <li>🎯 智能字幕语言选择</li>
+                <li>⚡ 快速WBI签名算法</li>
+            </ul>
+        </div>
+        
+        <div class="feature-list">
+            <h3>📋 使用说明</h3>
+            <ul>
+                <li>1. 点击插件图标打开控制面板</li>
+                <li>2. 启用"字幕下载功能"开关</li>
+                <li>3. 访问任意B站视频页面</li>
+                <li>4. 点击"下载字幕"按钮</li>
+                <li>5. 自动下载SRT格式字幕文件</li>
+            </ul>
+        </div>
+        
+        <div class="download-section">
+            <h3>🎯 直接下载功能</h3>
+            <div class="input-group">
+                <input type="text" id="videoInput" placeholder="请输入B站链接或BV号" class="video-input">
+                <button class="button download-btn" id="downloadBtn">下载字幕</button>
+            </div>
+            
+            <div class="mode-selector">
+                <label class="mode-toggle">
+                    <input type="checkbox" id="multiModeToggle">
+                    <span class="slider"></span>
+                    <span class="mode-label">多P模式</span>
+                </label>
+            </div>
+            
+            <div id="partsList" class="parts-list" style="display: none;">
+                <h4>📺 视频分P列表</h4>
+                <div id="partsContainer" class="parts-container"></div>
+            </div>
+            
+            <div id="status" class="status-message"></div>
+        </div>
+        
+        <button class="button" id="closeBtn">关闭页面</button>
+        <button class="button" id="visitBtn">访问B站</button>
+        
+        <div class="footer">
+            <p>版本 1.0.0 | 专为B站视频字幕下载而设计</p>
+        </div>
+    </div>
+    
+    <script src="blank-page.js"></script>
+</body>
+</html> 

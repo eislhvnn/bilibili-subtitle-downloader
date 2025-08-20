@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的Chrome插件</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <h1>B站字幕下载助手</h1>
+        <p>一键下载B站视频字幕</p>
+        
+        <div class="feature-section">
+            <h3>字幕下载功能</h3>
+            <div class="toggle-container">
+                <label class="toggle">
+                    <input type="checkbox" id="subtitleToggle">
+                    <span class="slider"></span>
+                </label>
+                <span class="toggle-label">启用字幕下载</span>
+            </div>
+            <div class="mode-selector">
+                <label class="mode-toggle">
+                    <input type="checkbox" id="multiModeToggle">
+                    <span class="slider"></span>
+                    <span class="mode-label">多P模式</span>
+                </label>
+            </div>
+            <button id="downloadButton" disabled>下载字幕</button>
+        </div>
+        
+        <div class="feature-section">
+            <h3>其他功能</h3>
+            <button id="openBlankPageButton">打开控制面板</button>
+        </div>
+        
+        <div class="status-section">
+            <div id="status"></div>
+            <div id="progress"></div>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html> 
