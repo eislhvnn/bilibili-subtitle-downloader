@@ -1,6 +1,7 @@
 # B站字幕下载Chrome插件
 
 这是一个专为B站视频设计的Chrome插件，可以一键下载视频字幕文件。
+([https://www.bilibili.com/video/你的视频BV号](https://www.bilibili.com/video/BV1K9vhBHEkb/?spm_id_from=333.1387.homepage.video_card.click))
 
 ## 文件结构
 
@@ -78,4 +79,5 @@
 - 使用Chrome开发者工具调试插件
 - 在扩展程序页面查看插件的错误信息
 - 使用`console.log`进行调试
+
 - 注意Manifest V3的API变化 
