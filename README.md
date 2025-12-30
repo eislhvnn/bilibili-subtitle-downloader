@@ -3,7 +3,7 @@
 这是一个专为B站视频设计的Chrome插件，可以一键下载视频字幕文件。
 
 <img width="421" height="259" alt="image" src="https://github.com/user-attachments/assets/fd880542-5347-450b-b028-6a1a9dc2c76a" />
-[![演示视频演示yan'shiya](【[过时的一个bilbil字幕下载插件分享](https://github.com/user-attachments/assets/fd880542-5347-450b-b028-6a1a9dc2c76a)】 https://www.bilibili.com/video/BV1K9vhBHEkb/?share_source=copy_web&vd_source=44d6f7ffc2e1270b787747c194285a4e)
+[![演示视频演示](https://www.bilibili.com/video/BV1K9vhBHEkb/?share_source=copy_web&vd_source=44d6f7ffc2e1270b787747c194285a4e)
 ## 文件结构
 
 ```
@@ -74,5 +74,6 @@
 - 插件仅在B站视频页面（bilibili.com/video/）工作
 - 需要确保视频有可用的字幕
 - 在开发过程中，修改代码后需要在扩展程序页面点击刷新按钮
+
 
 
