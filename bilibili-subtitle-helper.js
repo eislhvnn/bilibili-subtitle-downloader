@@ -136,6 +136,9 @@ class BiliWbiApiHelper {
         this.fixedDmParams = {
 
         };
+
+        // 导出格式：'srt'（带时间轴）或 'txt'（纯文本），默认srt
+        this.exportFormat = 'srt';
     }
 
     // --- Internal Helper Methods ---
@@ -214,6 +217,15 @@ class BiliWbiApiHelper {
             srtContent += `${line.content}\n\n`;
         });
         return srtContent;
+    }
+
+    _convertToTxt(subtitleJson) {
+        if (!subtitleJson.body || subtitleJson.body.length === 0) return '';
+        // 纯文本：每条字幕一行，仅保留文字内容，不含序号与时间轴
+        return subtitleJson.body
+            .map(line => (line.content || '').trim())
+            .filter(text => text.length > 0)
+            .join('\n');
     }
 
     _triggerDownload(content, filename, mimeType = 'text/plain') {
@@ -336,12 +348,23 @@ class BiliWbiApiHelper {
             });
             if (!subResponse.ok) throw new Error(`Subtitle fetch error! status: ${subResponse.status}`);
             const subtitleJson = await subResponse.json();
-            
-            console.log("➡️ Converting JSON to SRT format...");
-            const srtContent = this._convertToSrt(subtitleJson);
 
-            const filename = `${partInfo.bvid}_${partInfo.title.replace(/[\/\\?%*:|"<>]/g, '-')}.srt`;
-            this._triggerDownload(srtContent, filename, 'application/x-subrip');
+            const safeTitle = partInfo.title.replace(/[\/\\?%*:|"<>]/g, '-');
+            let outputContent, mimeType, ext;
+            if (this.exportFormat === 'txt') {
+                console.log("➡️ Converting JSON to TXT (plain text)...");
+                outputContent = this._convertToTxt(subtitleJson);
+                mimeType = 'text/plain';
+                ext = 'txt';
+            } else {
+                console.log("➡️ Converting JSON to SRT format...");
+                outputContent = this._convertToSrt(subtitleJson);
+                mimeType = 'application/x-subrip';
+                ext = 'srt';
+            }
+
+            const filename = `${partInfo.bvid}_${safeTitle}.${ext}`;
+            this._triggerDownload(outputContent, filename, mimeType);
 
         } catch (error) {
             console.error("❌ An error occurred during the final subtitle processing:", error);

@@ -4,11 +4,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const downloadButton = document.getElementById('downloadButton');
     const openBlankPageButton = document.getElementById('openBlankPageButton');
     const multiModeToggle = document.getElementById('multiModeToggle');
+    const formatRadios = document.querySelectorAll('input[name="exportFormat"]');
     const statusDiv = document.getElementById('status');
     const progressDiv = document.getElementById('progress');
-    
+
     // 加载保存的设置
-    chrome.storage.local.get(['subtitleEnabled', 'multiModeEnabled'], function(result) {
+    chrome.storage.local.get(['subtitleEnabled', 'multiModeEnabled', 'exportFormat'], function(result) {
         if (result.subtitleEnabled) {
             subtitleToggle.checked = true;
             downloadButton.disabled = false;
@@ -16,6 +17,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (result.multiModeEnabled) {
             multiModeToggle.checked = true;
         }
+        if (result.exportFormat) {
+            const saved = document.querySelector(`input[name="exportFormat"][value="${result.exportFormat}"]`);
+            if (saved) saved.checked = true;
+        }
+    });
+
+    // 导出格式切换事件
+    formatRadios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            if (!this.checked) return;
+            chrome.storage.local.set({ exportFormat: this.value });
+            statusDiv.textContent = this.value === 'txt' ? '导出格式：TXT 纯文本' : '导出格式：SRT 字幕';
+        });
     });
     
     // 切换开关事件
@@ -65,11 +79,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            console.log('向content script发送下载字幕消息');
+            const selectedFormat = document.querySelector('input[name="exportFormat"]:checked')?.value || 'srt';
+            console.log('向content script发送下载字幕消息，格式:', selectedFormat);
             // 向content script发送消息，启动字幕下载
             chrome.tabs.sendMessage(currentTab.id, {
                 action: 'downloadSubtitle',
-                multiMode: multiModeToggle.checked
+                multiMode: multiModeToggle.checked,
+                format: selectedFormat
             }, function(response) {
                 console.log('收到content script响应:', response);
                 console.log('chrome.runtime.lastError:', chrome.runtime.lastError);
