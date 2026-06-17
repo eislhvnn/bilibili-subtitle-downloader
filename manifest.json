@@ -23,7 +23,7 @@
   "content_scripts": [
     {
       "matches": ["*://*.bilibili.com/*"],
-      "js": ["content.js"],
+      "js": ["bilibili-subtitle-helper.js", "content.js"],
       "run_at": "document_start"
     }
   ],
@@ -31,11 +31,5 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["bilibili-subtitle-helper.js", "test-helper.js", "blank-page.html", "blank-page.js"],
-      "matches": ["*://*.bilibili.com/*", "<all_urls>"]
-    }
-  ]
+  }
 } 

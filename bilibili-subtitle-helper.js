@@ -1,10 +1,15 @@
 /**
  * Bilibili WBI & Subtitle Helper
- * Chrome插件版本
+ *
+ * 字幕下载核心模块：WBI 签名（含内置 MD5）、视频分P/合集信息获取、
+ * 字幕拉取与 SRT / TXT 转换、触发浏览器下载。
+ *
+ * 唯一实现来源，同时被内容脚本(content.js)与控制面板(blank-page.js)复用。
+ * 方法均不直接弹窗，失败时抛出异常，由调用方负责界面提示。
  */
 class BiliWbiApiHelper {
     constructor() {
-        // --- Self-contained MD5 implementation ---
+        // --- 内置 MD5 实现 ---
         this.md5 = (function() {
             function safe_add(x, y) {
                 var lsw = (x & 0xFFFF) + (y & 0xFFFF),
@@ -127,63 +132,62 @@ class BiliWbiApiHelper {
             };
         }());
 
+        // WBI mixin key 重排表
         this.mixinKeyEncTab = [
             46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49,
             33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40,
             61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11,
             36, 20, 34, 44, 52
         ];
-        this.fixedDmParams = {
 
+        // dm 指纹参数：默认值保证基本可用；运行时若后台从播放器请求中捕获到更新，会覆盖这些默认值
+        this.fixedDmParams = {
+            'isGaiaAvoided': 'false',
+            'web_location': '1315873',
+            'dm_img_list': '[]',
+            'dm_img_str': 'V2ViR0wgMS4wIChPcGVuR0wgRVMgMi4wIENocm9taXVtKQ',
+            'dm_cover_img_str': 'QU5HTEUgKEludGVsLCBJbnRlbChSKSBVSEQgR3JhcGhpY3MgNjIwICgweDAwMDA1OTE3KSBEaXJlY3QzRDExIHZzXzVfMCBwc181XzAsIEQzRDExKUdvb2dsZSBJbmMuIChJbnRlbC',
+            'dm_img_inter': '{"ds":[],"wh":[2959,5003,33],"of":[264,528,264]}'
         };
 
-        // 导出格式：'srt'（带时间轴）或 'txt'（纯文本），默认srt
+        // 导出格式：'srt'（带时间轴）或 'txt'（纯文本），由调用方按需设置
         this.exportFormat = 'srt';
+
+        this._loadDynamicDmParams();
     }
 
-    // --- Internal Helper Methods ---
-
-    async _getMixinKey() {
+    // 从 storage 读取后台捕获的动态指纹参数，并监听后续更新
+    _loadDynamicDmParams() {
         try {
-            const response = await fetch('https://api.bilibili.com/x/web-interface/nav', {
-                cache: 'no-store',
-                headers: { 'User-Agent': navigator.userAgent, 'Referer': 'https://www.bilibili.com/' },
-                credentials: 'include'
+            if (!(typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local)) return;
+            chrome.storage.local.get(['dynamicDmParams'], (res) => {
+                if (res && res.dynamicDmParams) this._updateFixedDmParams(res.dynamicDmParams);
             });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const json_data = await response.json();
-            if (json_data.code !== 0) throw new Error(`API error: [${json_data.code}] ${json_data.message}`);
-            const img_url = json_data.data.wbi_img.img_url;
-            const sub_url = json_data.data.wbi_img.sub_url;
-            const original_key = img_url.substring(img_url.lastIndexOf('/') + 1, img_url.lastIndexOf('.')) + sub_url.substring(sub_url.lastIndexOf('/') + 1, sub_url.lastIndexOf('.'));
-            let shuffled_key = '';
-            for (const i of this.mixinKeyEncTab) {
-                shuffled_key += original_key[i];
+            if (chrome.storage.onChanged) {
+                chrome.storage.onChanged.addListener((changes, area) => {
+                    if (area === 'local' && changes.dynamicDmParams) {
+                        this._updateFixedDmParams(changes.dynamicDmParams.newValue);
+                    }
+                });
             }
-            return shuffled_key.slice(0, 32);
-        } catch (error) {
-            console.error("Failed to get mixinKey:", error);
-            return null;
+        } catch (e) {
+            // storage 不可用时静默忽略，沿用默认指纹
         }
+    }
+
+    _updateFixedDmParams(newParams) {
+        if (!newParams || typeof newParams !== 'object') return;
+        const keys = ['isGaiaAvoided', 'web_location', 'dm_img_list', 'dm_img_str', 'dm_cover_img_str', 'dm_img_inter'];
+        keys.forEach(k => {
+            if (newParams[k] != null) this.fixedDmParams[k] = newParams[k];
+        });
     }
 
     _getBvId() {
-        console.log('开始获取BVID，当前URL:', window.location.href);
-        console.log('当前路径:', window.location.pathname);
-        
         const match = window.location.pathname.match(/BV[1-9A-HJ-NP-Za-km-z]{10}/i);
-        if (match) {
-            console.log('通过路径匹配找到BVID:', match[0]);
-            return match[0];
-        }
-        
+        if (match) return match[0];
         const seriesMatch = window.location.pathname.match(/\/series\/(BV[1-9A-HJ-NP-Za-km-z]{10})/i);
-        if (seriesMatch) {
-            console.log('通过系列匹配找到BVID:', seriesMatch[1]);
-            return seriesMatch[1];
-        }
-        
-        console.error("BV ID not found in the current URL.");
+        if (seriesMatch) return seriesMatch[1];
         return null;
     }
 
@@ -196,11 +200,10 @@ class BiliWbiApiHelper {
             queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
         }
         const query = queryParts.join('&');
-        const stringToHash = query + mixinKey;
-        const w_rid = this.md5(stringToHash);
+        const w_rid = this.md5(query + mixinKey);
         return { w_rid: w_rid, wts: params.wts };
     }
-    
+
     _convertToSrt(subtitleJson) {
         if (!subtitleJson.body || subtitleJson.body.length === 0) return '';
         const formatTime = (seconds) => {
@@ -238,168 +241,147 @@ class BiliWbiApiHelper {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        console.log(`✅ Download started for ${filename}`);
     }
-    
+
+    async _getMixinKey() {
+        const response = await fetch('https://api.bilibili.com/x/web-interface/nav', {
+            cache: 'no-store',
+            headers: { 'User-Agent': navigator.userAgent, 'Referer': 'https://www.bilibili.com/' },
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const json_data = await response.json();
+        if (json_data.code !== 0) throw new Error(`获取签名密钥失败：[${json_data.code}] ${json_data.message}`);
+        const img_url = json_data.data.wbi_img.img_url;
+        const sub_url = json_data.data.wbi_img.sub_url;
+        const original_key = img_url.substring(img_url.lastIndexOf('/') + 1, img_url.lastIndexOf('.')) +
+                             sub_url.substring(sub_url.lastIndexOf('/') + 1, sub_url.lastIndexOf('.'));
+        let shuffled_key = '';
+        for (const i of this.mixinKeyEncTab) shuffled_key += original_key[i];
+        return shuffled_key.slice(0, 32);
+    }
+
     async _getAllPartsList(bvid) {
-        console.log(`➡️ Fetching comprehensive video info for BVID: ${bvid}...`);
         const url = `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`;
-        try {
-            const response = await fetch(url, {
-                headers: { 'User-Agent': navigator.userAgent, 'Referer': `https://www.bilibili.com/video/${bvid}/` },
-                credentials: 'include'
+        const response = await fetch(url, {
+            headers: { 'User-Agent': navigator.userAgent, 'Referer': `https://www.bilibili.com/video/${bvid}/` },
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const json_data = await response.json();
+        if (json_data.code !== 0) throw new Error(`获取视频信息失败：${json_data.message}`);
+
+        const videoData = json_data.data;
+        const results = [];
+        const processedCids = new Set();
+        const mainBvid = videoData.bvid;
+        const mainAid = videoData.aid;
+
+        // 分P
+        if (videoData.pages && videoData.pages.length > 0) {
+            videoData.pages.forEach(page => {
+                if (page.cid && !processedCids.has(page.cid)) {
+                    results.push({ title: page.part || `P${page.page}`, bvid: mainBvid, cid: page.cid, aid: mainAid, page: page.page });
+                    processedCids.add(page.cid);
+                }
             });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const json_data = await response.json();
-            if (json_data.code !== 0) throw new Error(`API error: ${json_data.message}`);
-
-            const videoData = json_data.data;
-            const results = [];
-            const processedCids = new Set();
-            
-            const mainBvid = videoData.bvid;
-            const mainAid = videoData.aid;
-
-            if (videoData.pages && videoData.pages.length > 0) {
-                 videoData.pages.forEach(page => {
-                    if (page.cid && !processedCids.has(page.cid)) {
-                        results.push({
-                            title: page.part || `P${page.page}`,
-                            bvid: mainBvid,
-                            cid: page.cid,
-                            aid: mainAid
-                        });
-                        processedCids.add(page.cid);
-                    }
-                 });
-            }
-
-            if (videoData.ugc_season && videoData.ugc_season.sections) {
-                videoData.ugc_season.sections.forEach(section => {
-                    section.episodes.forEach(episode => {
-                        if (episode.cid && !processedCids.has(episode.cid)) {
-                            results.push({
-                                title: episode.title,
-                                bvid: episode.bvid,
-                                cid: episode.cid,
-                                aid: episode.aid
-                            });
-                            processedCids.add(episode.cid);
-                        }
-                    });
-                });
-            }
-            
-            if (results.length === 0 && videoData.cid && !processedCids.has(videoData.cid)) {
-                 results.push({
-                    title: videoData.title,
-                    bvid: mainBvid,
-                    cid: videoData.cid,
-                    aid: mainAid
-                });
-            }
-
-            console.log(`✅ Found ${results.length} unique video parts.`);
-            return results;
-        } catch (error) {
-            console.error("❌ Failed to get or process comprehensive video parts list:", error);
-            return null;
         }
+
+        // 合集 / 系列
+        if (videoData.ugc_season && videoData.ugc_season.sections) {
+            videoData.ugc_season.sections.forEach(section => {
+                section.episodes.forEach(episode => {
+                    if (episode.cid && !processedCids.has(episode.cid)) {
+                        results.push({ title: episode.title, bvid: episode.bvid, cid: episode.cid, aid: episode.aid });
+                        processedCids.add(episode.cid);
+                    }
+                });
+            });
+        }
+
+        // 兜底：单视频
+        if (results.length === 0 && videoData.cid && !processedCids.has(videoData.cid)) {
+            results.push({ title: videoData.title, bvid: mainBvid, cid: videoData.cid, aid: mainAid });
+        }
+
+        return results;
     }
 
-    async _fetchAndDownloadSubtitleForPart(partInfo, lang) {
-        console.log(`🚀 Starting process for: "${partInfo.title}" (cid: ${partInfo.cid})`);
-        
+    // 获取某分P的可用字幕轨列表（已做 WBI 签名）。返回数组，每项含 lan / lan_doc / subtitle_url。
+    async _getSubtitleTracks(partInfo) {
         const mixinKey = await this._getMixinKey();
-        if (!mixinKey) return;
-        console.log("✅ Got WBI mixinKey.");
+        if (!mixinKey) throw new Error('无法获取 WBI 签名密钥');
 
-        let baseParams = { aid: partInfo.aid, cid: partInfo.cid, ...this.fixedDmParams };
+        const baseParams = { aid: partInfo.aid, cid: partInfo.cid, ...this.fixedDmParams };
         const signature = this._signRequest(baseParams, mixinKey);
         const finalParams = { ...baseParams, ...signature };
         const finalUrl = `https://api.bilibili.com/x/player/wbi/v2?${new URLSearchParams(finalParams)}`;
 
-        console.log("➡️ Sending signed request for player data...");
-        try {
-            const response = await fetch(finalUrl, {
-                credentials: 'include',
-                headers: { 'Referer': `https://www.bilibili.com/video/${partInfo.bvid}/`, 'User-Agent': navigator.userAgent }
-            });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const videoData = await response.json();
-            if (videoData.code !== 0) throw new Error(`Player API error: [${videoData.code}] ${videoData.message}`);
+        const response = await fetch(finalUrl, {
+            credentials: 'include',
+            headers: { 'Referer': `https://www.bilibili.com/video/${partInfo.bvid}/`, 'User-Agent': navigator.userAgent }
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const videoData = await response.json();
+        if (videoData.code !== 0) throw new Error(`获取播放信息失败：[${videoData.code}] ${videoData.message}`);
 
-            const subtitles = videoData.data.subtitle?.subtitles;
-            if (!subtitles || subtitles.length === 0) {
-                console.error("❌ No subtitles found for this video part.");
-                return;
-            }
-            let targetSubtitle = subtitles.find(sub => sub.lan === lang);
-            if (!targetSubtitle) {
-                console.warn(`⚠️ Language "${lang}" not found. Defaulting to first available: "${subtitles[0].lan_doc}".`);
-                targetSubtitle = subtitles[0];
-            } else {
-                console.log(`✅ Found subtitle track: "${targetSubtitle.lan_doc}"`);
-            }
-            
-            const subtitleUrl = `https:${targetSubtitle.subtitle_url}`;
-            const subResponse = await fetch(subtitleUrl, {
-                headers: { 'User-Agent': navigator.userAgent, 'Referer': `https://www.bilibili.com/video/${partInfo.bvid}/` }
-            });
-            if (!subResponse.ok) throw new Error(`Subtitle fetch error! status: ${subResponse.status}`);
-            const subtitleJson = await subResponse.json();
-
-            const safeTitle = partInfo.title.replace(/[\/\\?%*:|"<>]/g, '-');
-            let outputContent, mimeType, ext;
-            if (this.exportFormat === 'txt') {
-                console.log("➡️ Converting JSON to TXT (plain text)...");
-                outputContent = this._convertToTxt(subtitleJson);
-                mimeType = 'text/plain';
-                ext = 'txt';
-            } else {
-                console.log("➡️ Converting JSON to SRT format...");
-                outputContent = this._convertToSrt(subtitleJson);
-                mimeType = 'application/x-subrip';
-                ext = 'srt';
-            }
-
-            const filename = `${partInfo.bvid}_${safeTitle}.${ext}`;
-            this._triggerDownload(outputContent, filename, mimeType);
-
-        } catch (error) {
-            console.error("❌ An error occurred during the final subtitle processing:", error);
-        }
+        return videoData.data.subtitle?.subtitles || [];
     }
 
-    async selectAndDownloadSubtitle(lang = 'ai-zh') {
-        console.log('开始执行selectAndDownloadSubtitle方法');
-        
-        const bvid = this._getBvId();
-        console.log('获取到的BVID:', bvid);
-        if (!bvid) {
-            console.error('无法获取BVID');
-            return;
+    // 下载指定字幕轨，按 exportFormat 输出 SRT / TXT
+    async _downloadTrack(track, partInfo) {
+        const subResponse = await fetch(`https:${track.subtitle_url}`, {
+            headers: { 'User-Agent': navigator.userAgent, 'Referer': `https://www.bilibili.com/video/${partInfo.bvid}/` }
+        });
+        if (!subResponse.ok) throw new Error(`字幕拉取失败！status: ${subResponse.status}`);
+        const subtitleJson = await subResponse.json();
+
+        const safeTitle = (partInfo.title || partInfo.bvid).replace(/[\/\\?%*:|"<>]/g, '-');
+        const langTag = track.lan ? `_${track.lan}` : '';
+        let outputContent, mimeType, ext;
+        if (this.exportFormat === 'txt') {
+            outputContent = this._convertToTxt(subtitleJson);
+            mimeType = 'text/plain';
+            ext = 'txt';
+        } else {
+            outputContent = this._convertToSrt(subtitleJson);
+            mimeType = 'application/x-subrip';
+            ext = 'srt';
         }
+        this._triggerDownload(outputContent, `${partInfo.bvid}_${safeTitle}${langTag}.${ext}`, mimeType);
+    }
+
+    // 便捷方法：按语言自动挑选并下载（无界面，供程序化/控制面板调用）
+    async _fetchAndDownloadSubtitleForPart(partInfo, lang = 'ai-zh') {
+        const tracks = await this._getSubtitleTracks(partInfo);
+        if (!tracks || tracks.length === 0) throw new Error('该视频没有可用字幕');
+        const target = tracks.find(t => t.lan === lang) || tracks[0];
+        await this._downloadTrack(target, partInfo);
+    }
+
+    // 根据 URL 的 ?p= 与当前 BV 号，定位当前正在播放的分P
+    _getCurrentPart(partsList) {
+        const currentBvid = this._getBvId();
+        const p = parseInt(new URLSearchParams(window.location.search).get('p') || '1', 10);
+        const sameBvid = partsList.filter(part => part.bvid === currentBvid);
+        if (sameBvid.length > 1) return sameBvid.find(part => part.page === p) || sameBvid[0];
+        if (sameBvid.length === 1) return sameBvid[0];
+        return partsList[0];
+    }
+
+    // 下载当前正在播放的分P（单P模式）。customBvid 供控制面板按 BV 号直接下载。
+    async selectAndDownloadSubtitle(lang = 'ai-zh', customBvid = null) {
+        const bvid = customBvid || this._getBvId();
+        if (!bvid) throw new Error('无法获取 BV 号');
 
         const partsList = await this._getAllPartsList(bvid);
-        console.log('获取到的视频分P列表:', partsList);
-        if (!partsList || partsList.length === 0) {
-            console.error("❌ Could not retrieve any video parts. Please check the BVID or network.");
-            return;
-        }
+        if (!partsList || partsList.length === 0) throw new Error('无法获取视频分P信息');
 
-        // 在Chrome插件环境中，直接下载第一个分P的字幕
-        console.log('在插件环境中，自动选择第一个分P进行下载');
-        const selectedPart = partsList[0];
-        console.log('选择的视频分P:', selectedPart);
-        
-        await this._fetchAndDownloadSubtitleForPart(selectedPart, lang);
+        const target = customBvid ? partsList[0] : this._getCurrentPart(partsList);
+        await this._fetchAndDownloadSubtitleForPart(target, lang);
     }
 }
 
-// 导出类供其他文件使用
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = BiliWbiApiHelper;
-} else {
-    window.BiliWbiApiHelper = BiliWbiApiHelper;
-} 
+// 作为全局类暴露，供内容脚本与扩展页面共用
+if (typeof window !== 'undefined') window.BiliWbiApiHelper = BiliWbiApiHelper;
+if (typeof module !== 'undefined' && module.exports) module.exports = BiliWbiApiHelper;
