@@ -4,8 +4,6 @@
 
 <img width="421" height="259" alt="插件界面" src="https://github.com/user-attachments/assets/fd880542-5347-450b-b028-6a1a9dc2c76a" />
 
-📺 [点击观看 B 站视频演示](https://www.bilibili.com/video/BV1K9vhBHEkb/)
-
 ---
 
 ## ✨ 功能特点
